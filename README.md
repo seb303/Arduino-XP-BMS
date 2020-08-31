@@ -44,7 +44,7 @@ Requires the following additional components:
 Installation & Configuration
 ----------------------------
 * Install Arduino IDE, and if using Teensy hardware: Teensyduino - https://www.pjrc.com/teensy/teensyduino.html
-* Select board and clock rate (e.g. 24 MHz is plenty fast enough)
+* Select board and clock rate (e.g. 24 MHz is plenty fast enough).
 * Define the pin numbers where the outputs and RS485 driver are connected.
 * Define other board-specific parameters, such as port for Serial Monitor, EEPROM size, etc.
 * List the battery ids in the batteries array.
@@ -54,20 +54,23 @@ Installation & Configuration
 
 Console interface
 -----------------
-Commands can be entered via the Serial Monitor.  
-debug 0      - turn off debugging output  
-debug 1      - debugging output shows errors, status changes and other occasional info  
-debug 2      - in addition to the above, debugging output shows continuous status and readings from batteries  
-debug 21     - show status and readings from batteries once, then switch to debug level 1  
-mode normal  - enter normal mode  
-mode storage - enter long term storage mode  
-log read     - read events log from EEPROM  
-log clear    - clear events log  
-reset cw     - resets CommsWarning status (otherwise this stays on once triggered)  
+```
+Commands can be entered via the Serial Monitor.
+debug 0      - turn off debugging output
+debug 1      - debugging output shows errors, status changes and other occasional info
+debug 2      - in addition to the above, debugging output shows continuous status and readings from batteries
+debug 21     - show status and readings from batteries once, then switch to debug level 1
+mode normal  - enter normal mode
+mode storage - enter long term storage mode
+log read     - read events log from EEPROM
+log clear    - clear events log
+reset cw     - resets CommsWarning status (otherwise this stays on once triggered)
+```
 
 EEPROM data
 -----------
-```The top 32 bytes are reserved for storing settings persistently:
+```
+The top 32 bytes are reserved for storing settings persistently:
 Byte 0: debug level (0, 1, 2)
 Byte 1: mode (0 = normal, 1 = storage)
 
