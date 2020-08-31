@@ -98,10 +98,6 @@ SOC (uint16_t)
 
 5 bytes unused
 ```
-To do
------
-Further research on sensible threshold voltages, temperatures, Min/Max SOC
-
 License
 -------
 This sketch is released under GPLv3 and comes with no warranty or guarantees. Use at your own risk!
