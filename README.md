@@ -1,6 +1,6 @@
-Arduino-XP-BMS  v1.0 2020-08-31
--------------------------------
-A BMS for Valence XP batteries, designed to run on Arduino or similar hardware.
+Arduino-XP-BMS
+--------------
+A BMS for Valence XP batteries, designed to run on Arduino or similar hardware.  
 by Seb Francis -> https://diysolarforum.com/members/seb303.13166/
 
 https://github.com/seb303/Arduino-XP-BMS
@@ -30,10 +30,10 @@ in the case of Arduino a board with multiple serial ports, such as the Mega or D
 The clock speed will need to be adequate for good serial timing at 115200 baud. Unless using a specific crystal which is an exact
 multiple of 115200, a good rule of thumb would be to have a clock speed around 20Mhz or more to ensure good enough timing. This
 does also depend on how the hardware is implemented - for example, the Teensy 3.2 has a high resolution baud rate for the hardware
-UART, and so is particularly accurate. The exact serial timing error depends on the clock rate:
-At 24 MHz: -0.08%  <- plenty accurate enough, and uses the least power
-At 48 Mhz: +0.04%
-At 96 MHz: -0.02%
+UART, and so is particularly accurate. The exact serial timing error depends on the clock rate:  
+At 24 MHz: -0.08%  <- plenty accurate enough, and uses the least power  
+At 48 Mhz: +0.04%  
+At 96 MHz: -0.02%  
 
 Requires the following additional components:
 * A 5V voltage regulator
@@ -48,26 +48,26 @@ Installation & Configuration
 * Define the pin numbers where the outputs and RS485 driver are connected.
 * Define other board-specific parameters, such as port for Serial Monitor, EEPROM size, etc.
 * List the battery ids in the batteries array.
-* Configure the desired thresholds for voltage, temperature and SOC.
+* Configure the desired thresholds for voltage, temperature and SOC.  
   The default settings are quite conservative, chosen to maximise battery life rather than squeeze out every last Ah of
   capacity. The values used by the official Valence U-BMS are much less conservative, and are shown in the comments.
 
 Console interface
 -----------------
-Commands can be entered via the Serial Monitor.
-debug 0      - turn off debugging output
-debug 1      - debugging output shows errors, status changes and other occasional info
-debug 2      - in addition to the above, debugging output shows continuous status and readings from batteries
-debug 21     - show status and readings from batteries once, then switch to debug level 1
-mode normal  - enter normal mode
-mode storage - enter long term storage mode
-log read     - read events log from EEPROM
-log clear    - clear events log
-reset cw     - resets CommsWarning status (otherwise this stays on once triggered)
+Commands can be entered via the Serial Monitor.  
+debug 0      - turn off debugging output  
+debug 1      - debugging output shows errors, status changes and other occasional info  
+debug 2      - in addition to the above, debugging output shows continuous status and readings from batteries  
+debug 21     - show status and readings from batteries once, then switch to debug level 1  
+mode normal  - enter normal mode  
+mode storage - enter long term storage mode  
+log read     - read events log from EEPROM  
+log clear    - clear events log  
+reset cw     - resets CommsWarning status (otherwise this stays on once triggered)  
 
 EEPROM data
 -----------
-The top 32 bytes are reserved for storing settings persistently:
+```The top 32 bytes are reserved for storing settings persistently:
 Byte 0: debug level (0, 1, 2)
 Byte 1: mode (0 = normal, 1 = storage)
 
@@ -94,7 +94,7 @@ PCBA (int16_t)
 SOC (uint16_t)
 
 5 bytes unused
-
+```
 To do
 -----
 Further research on sensible threshold voltages, temperatures, Min/Max SOC
