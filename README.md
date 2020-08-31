@@ -1,4 +1,3 @@
-```
 Arduino-XP-BMS  v1.0 2020-08-31
 -------------------------------
 A BMS for Valence XP batteries, designed to run on Arduino or similar hardware.
@@ -105,4 +104,4 @@ License
 This sketch is released under GPLv3 and comes with no warranty or guarantees. Use at your own risk!
 Libraries used in this sketch may have licenses that differ from the one governing this sketch.
 Please consult the repositories of those libraries for information.
-```
+
