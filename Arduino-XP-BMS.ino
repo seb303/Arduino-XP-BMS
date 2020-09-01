@@ -346,7 +346,7 @@ void loop() {
     for (i = 0; i < sizeof(batteries); i++) {
         bool statusChangeTriggered = 0;
         
-        char battStr[13];
+        char battStr[14];
         sprintf(battStr, "Battery %-5u", batteries[i]);
         
         // Ensure read buffer is empty
@@ -930,12 +930,12 @@ void loop() {
                     uint8_t batteryId;
                     EEPROM.get(b+6, batteryId);
                     if (batteryId != 0) {
-                        char battStr[5];
-                        sprintf(battStr, "%-5u", batteryId);
-                        Console.println("Triggered by battery "+ String(battStr) +" V1   V2   V3   V4   VT    T1   T2   T3   T4   PCBA SOC");
+                        char str[7];
+                        
+                        sprintf(str, "%-5u", batteryId);
+                        Console.println("Triggered by battery "+ String(str) +" V1   V2   V3   V4   VT    T1   T2   T3   T4   PCBA SOC");
                         Console.print(  "                           ");
                     
-                        char str[6];
                         int total = 0;
                         for (j = 0; j < NumberOfCells*2+1; j++) {
                             int16_t val;
@@ -1052,9 +1052,9 @@ void handleStatusChange(uint16_t currentStatus, uint8_t batteryId, int16_t volts
     log(  "Current status:            ");
     logStatusLn(currentStatus);
     if (batteryId != 0) {
-        char battStr[5];
-        sprintf(battStr, "%-5u", batteryId);
-        logln("Triggered by battery "+ String(battStr) +" V1   V2   V3   V4   VT    T1   T2   T3   T4   PCBA SOC");
+        char str[6];
+        sprintf(str, "%-5u", batteryId);
+        logln("Triggered by battery "+ String(str) +" V1   V2   V3   V4   VT    T1   T2   T3   T4   PCBA SOC");
         log(  "                           ");
         logVolts(volts);
         logTemps(temps);
@@ -1158,19 +1158,18 @@ void logStatusLn(uint16_t status) {
 // Outputs volts and Vt
 void logVolts(int16_t volts[]) {
     int total = 0;
-    char str[5];
+    char str[7];
     for (unsigned int j = 0; j < NumberOfCells; j++) {
         sprintf(str, "%-5d", volts[j]);
         log(str);
         total += volts[j];
     }
-    char tstr[6];
-    sprintf(tstr, "%-6d", total);
-    log(tstr);
+    sprintf(str, "%-6d", total);
+    log(str);
 }
 // Outputs temperatures
 void logTemps(int16_t temps[]) {
-    char str[5];
+    char str[6];
     for (unsigned int j = 0; j < NumberOfCells+1; j++) {
         sprintf(str, "%-5d", temps[j]);
         log(str);
@@ -1178,13 +1177,13 @@ void logTemps(int16_t temps[]) {
 }
 // Outputs SOC
 void logSOC(uint16_t soc) {
-    char str[6];
+    char str[7];
     sprintf(str, "%-6.1f", soc/10.0);
     log(str);
 }
 // Outputs Balance
 void logBalance(uint8_t balance) {
-    char str[5];
+    char str[6];
     sprintf(str, "%-5d", balance);
     log(str);
 }
