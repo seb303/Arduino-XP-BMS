@@ -1,4 +1,4 @@
-Arduino-XP-BMS  v1.1 2020-09-01
+Arduino-XP-BMS  v1.2 2020-09-02
 -------------------------------
 A BMS for Valence XP batteries, designed to run on Arduino or similar hardware.  
 by Seb Francis -> https://diysolarforum.com/members/seb303.13166/
@@ -60,6 +60,7 @@ debug 0      - turn off debugging output
 debug 1      - debugging output shows errors, status changes and other occasional info
 debug 2      - in addition to the above, debugging output shows continuous status and readings from batteries
 debug 21     - show status and readings from batteries once, then switch to debug level 1
+debug 2 <n>  - show status and readings from batteries every <n> seconds, otherwise as debug level 1
 mode normal  - enter normal mode
 mode storage - enter long term storage mode
 log read     - read events log from EEPROM
@@ -95,8 +96,9 @@ T3 (int16_t)
 T4 (int16_t)
 PCBA (int16_t)
 SOC (uint16_t)
+CURRENT (int16_t)
 
-5 bytes unused
+3 bytes unused
 ```
 License
 -------
