@@ -69,6 +69,7 @@
 // debug 1      - debugging output shows errors, status changes and other occasional info
 // debug 2      - in addition to the above, debugging output shows continuous status and readings from batteries
 // debug 21     - show status and readings from batteries once, then switch to debug level 1
+// debug 2 <n>  - show status and readings from batteries every <n> seconds, otherwise as debug level 1
 // mode normal  - enter normal mode
 // mode storage - enter long term storage mode
 // log read     - read events log from EEPROM
@@ -82,11 +83,11 @@
 // Byte 1: mode (0 = normal, 1 = storage)
 //
 // The rest of the EEPROM stores a 32 byte data packet whenever the status changes:
-//
 // 0  PO   0   0   ST  STC  EC  EL  OTW OTS OVW OVS UVW UVS CW  CS (uint16_t bitmap)
 //      PO is set for the first event after power on
 //      ST is set when storage mode is active
 //      STC is set when storage mode is active and charging (i.e. storageMinSOC has been reached)
+//
 //
 // Timestamp of event = number of seconds since power-on (uint32_t)
 //
@@ -102,12 +103,9 @@
 // T4 (int16_t)
 // PCBA (int16_t)
 // SOC (uint16_t)
+// CURRENT (int16_t)
 //
-// 5 bytes unused
-//
-// To do
-// -----
-// Further research on sensible threshold voltages, temperatures, Min/Max SOC
+// 3 bytes unused
 //
 // License
 // -------
@@ -176,14 +174,14 @@ int16_t OT_Hysteresis = 200;    // Temperature of all cells must drop below thre
 
 // Over voltage thresholds (mV)
 // A shutdown condition disables charging
-int16_t cellOV_Warning = 3600;  // Valence U-BMS value = 3900
-int16_t cellOV_Shutdown = 3800; // Valence U-BMS value = 4000
+int16_t cellOV_Warning = 3600;  // Valence U-BMS value = 3900  [maybe 3600 will trigger warnings too easily, 3700 might be better]
+int16_t cellOV_Shutdown = 3900; // Valence U-BMS value = 4000
 int16_t OV_Hysteresis = 200;    // Voltage of all cells must drop below threshold by this amount before warning/shutdown disabled
 
 // Under voltage thresholds (mV)
 // A shutdown condition disables load
 int16_t cellUV_Warning = 3000;  // Valence U-BMS value = 2800
-int16_t cellUV_Shutdown = 2700; // Valence U-BMS value = 2300
+int16_t cellUV_Shutdown = 2800; // Valence U-BMS value = 2300
 int16_t UV_Hysteresis = 200;    // Voltage of all cells must rise above threshold by this amount before warning/shutdown disabled
 
 // Long term storage SOC range (%)
@@ -198,6 +196,8 @@ uint16_t storageMaxSOC = 80;     // Once charging is enabled, when at least 1 ba
 // Debug level
 #define InitialDebugLevel 1
 uint8_t debugLevel;
+uint32_t debugInterval = 0;
+uint32_t lastDebugOutput;
 // Mode
 #define InitialMode 0
 
@@ -213,9 +213,15 @@ uint8_t messageW[] = {0x00, 0x00, 0x01, 0x01, 0xc0, 0x74, 0x0d, 0x0a, 0x00, 0x00
 uint8_t writeSingleCoil1[] = {0x00, 0x05, 0x00, 0x00, 0x10, 0x00, 0x00, 0x0d, 0x0a};
 uint8_t writeSingleCoil2[] = {0x00, 0x05, 0x00, 0x00, 0x08, 0x00, 0x00, 0x0d, 0x0a};
 uint8_t readVolts[] = {0x00, 0x03, 0x00, 0x45, 0x00, 0x09, 0x00, 0x00, 0x0d, 0x0a};
+#define readVoltsResLen 25
 uint8_t readTemps[] = {0x00, 0x03, 0x00, 0x50, 0x00, 0x07, 0x00, 0x00, 0x0d, 0x0a};
+#define readTempsResLen 21
 uint8_t readSOC[] = {0x00, 0x03, 0x00, 0x6a, 0x00, 0x0c, 0x00, 0x00, 0x0d, 0x0a};
+#define readSOCResLen 31
+uint8_t readCurrent[] = {0x00, 0x03, 0x00, 0x39, 0x00, 0x0a, 0x00, 0x00, 0x0d, 0x0a};
+#define readCurrentResLen 27
 uint8_t readBalance[] = {0x00, 0x03, 0x00, 0x1e, 0x00, 0x01, 0x00, 0x00, 0x0d, 0x0a};
+#define readBalanceResLen 9
 
 // Status
 #define STATUS_PO 14
@@ -332,14 +338,16 @@ void loop() {
     bool allClear_OverTemperatureShutdown = 1;
     unsigned int readErrorCount = 0;
     uint16_t currentStatus = previousStatus;
+    uint8_t res[31];  // Longest response is 31 bytes
     int16_t volts[4] = {0,0,0,0};
     int16_t temps[5] = {0,0,0,0,0};
     uint16_t soc = 0;
+    int16_t current = 0;
     uint8_t balance = 0;
 
     // Header row
     if (debugLevel >= 2) {
-        logln("             V1   V2   V3   V4   VT    T1   T2   T3   T4   PCBA SOC   BAL");
+        logln("             V1   V2   V3   V4   VT    T1   T2   T3   T4   PCBA SOC   CURRENT BAL");
     }
         
     // Iterate through all of the batteries connected to the BMS.
@@ -366,26 +374,25 @@ void loop() {
             currentTime = millis();
         } while (currentTime - startTime < readPause);
 
-        uint8_t resV[25];  // Expecting 25 byte response
         bytesReceived = RS485.available();
-        if (bytesReceived == sizeof(resV)) {
-            for (j = 0; j < sizeof(resV); j++) {
+        if (bytesReceived == readVoltsResLen) {
+            for (j = 0; j < readVoltsResLen; j++) {
                 uint8_t b = RS485.read();
-                resV[j] = b;
+                res[j] = b;
             }
             // Check response is as expected
-            if (resV[0] != batteries[i] || resV[1] != 0x03 || resV[2] != 0x12 || resV[23] != 0x0d || resV[24] != 0x0a) {
+            if (res[0] != batteries[i] || res[1] != 0x03 || res[2] != 0x12 || res[23] != 0x0d || res[24] != 0x0a) {
                 readErrorCount++;
                 log(String(battStr) +"Invalid readVolts response: ");
-                logBytes(resV, sizeof(resV));
+                logBytes(res, readVoltsResLen);
                 logln("");
                 continue;
             }
             
-            volts[0] = (resV[9] << 8) + resV[10];  // V1
-            volts[1] = (resV[11] << 8) + resV[12]; // V2
-            volts[2] = (resV[13] << 8) + resV[14]; // V3
-            volts[3] = (resV[15] << 8) + resV[16]; // V4
+            volts[0] = (res[9] << 8) + res[10];  // V1
+            volts[1] = (res[11] << 8) + res[12]; // V2
+            volts[2] = (res[13] << 8) + res[14]; // V3
+            volts[3] = (res[15] << 8) + res[16]; // V4
             
             // Output voltages
             if (debugLevel >= 2) {
@@ -492,27 +499,26 @@ void loop() {
             currentTime = millis();
         } while (currentTime - startTime < readPause);
 
-        uint8_t resT[21];  // Expecting 21 byte response
         bytesReceived = RS485.available();
-        if (bytesReceived == sizeof(resT)) {
-            for (j = 0; j < sizeof(resT); j++) {
+        if (bytesReceived == readTempsResLen) {
+            for (j = 0; j < readTempsResLen; j++) {
                 uint8_t b = RS485.read();
-                resT[j] = b;
+                res[j] = b;
             }
             // Check response is as expected
-            if (resT[0] != batteries[i] || resT[1] != 0x03 || resT[2] != 0x0e || resT[19] != 0x0d || resT[20] != 0x0a) {
+            if (res[0] != batteries[i] || res[1] != 0x03 || res[2] != 0x0e || res[19] != 0x0d || res[20] != 0x0a) {
                 readErrorCount++;
                 log(String(battStr) +"Invalid readTemps response: ");
-                logBytes(resT, sizeof(resT));
+                logBytes(res, readTempsResLen);
                 logln("");
                 continue;
             }
             
-            temps[0] = (resT[5] << 8) + resT[6];   // T1
-            temps[1] = (resT[7] << 8) + resT[8];   // T2
-            temps[2] = (resT[9] << 8) + resT[10];  // T3
-            temps[3] = (resT[11] << 8) + resT[12]; // T4
-            temps[4] = (resT[3] << 8) + resT[4];   // PCBA
+            temps[0] = (res[5] << 8) + res[6];   // T1
+            temps[1] = (res[7] << 8) + res[8];   // T2
+            temps[2] = (res[9] << 8) + res[10];  // T3
+            temps[3] = (res[11] << 8) + res[12]; // T4
+            temps[4] = (res[3] << 8) + res[4];   // PCBA
             
             // Output temperatures
             if (debugLevel >= 2) {
@@ -610,23 +616,22 @@ void loop() {
             currentTime = millis();
         } while (currentTime - startTime < readPause);
 
-        uint8_t resS[31];  // Expecting 31 byte response
         bytesReceived = RS485.available();
-        if (bytesReceived == sizeof(resS)) {
-            for (j = 0; j < sizeof(resS); j++) {
+        if (bytesReceived == readSOCResLen) {
+            for (j = 0; j < readSOCResLen; j++) {
                 uint8_t b = RS485.read();
-                resS[j] = b;
+                res[j] = b;
             }
             // Check response is as expected
-            if (resS[0] != batteries[i] || resS[1] != 0x03 || resS[2] != 0x18 || resS[29] != 0x0d || resS[30] != 0x0a) {
+            if (res[0] != batteries[i] || res[1] != 0x03 || res[2] != 0x18 || res[29] != 0x0d || res[30] != 0x0a) {
                 readErrorCount++;
                 log(String(battStr) +"Invalid readSOC response: ");
-                logBytes(resS, sizeof(resS));
+                logBytes(res, readSOCResLen);
                 logln("");
                 continue;
             }
             
-            soc = (resS[3] << 8) + resS[4];   // SOC
+            soc = (res[3] << 8) + res[4];   // SOC
             
             // Output SOC
             if (debugLevel >= 2) {
@@ -665,6 +670,57 @@ void loop() {
             RS485.read();
         }
     
+        readCurrent[0] = batteries[i];
+        readCurrent[6] = lowByte(ModRTU_CRC(readCurrent, 6));
+        readCurrent[7] = highByte(ModRTU_CRC(readCurrent, 6));
+
+        writeToRS485(readCurrent, sizeof(readCurrent));
+
+        // Allow time for response
+        startTime = millis();
+        do {
+            currentTime = millis();
+        } while (currentTime - startTime < readPause);
+
+        bytesReceived = RS485.available();
+        if (bytesReceived == readCurrentResLen) {
+            for (j = 0; j < readCurrentResLen; j++) {
+                uint8_t b = RS485.read();
+                res[j] = b;
+            }
+            // Check response is as expected
+            if (res[0] != batteries[i] || res[1] != 0x03 || res[2] != 0x14 || res[25] != 0x0d || res[26] != 0x0a) {
+                readErrorCount++;
+                log(String(battStr) +"Invalid readCurrent response: ");
+                logBytes(res, readCurrentResLen);
+                logln("");
+                continue;
+            }
+            
+            current = (res[17] << 8) + res[18];     // Current
+            
+            // Output SOC
+            if (debugLevel >= 2) {
+                logCurrent(current);
+            }
+        } else { // Didn't receive expected response
+            readErrorCount++;
+            log(String(battStr) +"Invalid readCurrent response: ");
+            if (bytesReceived == 0) {
+                logln("0 bytes received");
+            } else {
+                logBytes();
+                logln("");
+            }
+            continue;
+        }
+        
+        
+        // Ensure read buffer is empty
+        while (RS485.available()) {
+            RS485.read();
+        }
+    
         readBalance[0] = batteries[i];
         readBalance[6] = lowByte(ModRTU_CRC(readBalance, 6));
         readBalance[7] = highByte(ModRTU_CRC(readBalance, 6));
@@ -677,23 +733,22 @@ void loop() {
             currentTime = millis();
         } while (currentTime - startTime < readPause);
 
-        uint8_t resB[9];  // Expecting 9 byte response
         bytesReceived = RS485.available();
-        if (bytesReceived == sizeof(resB)) {
-            for (j = 0; j < sizeof(resB); j++) {
+        if (bytesReceived == readBalanceResLen) {
+            for (j = 0; j < readBalanceResLen; j++) {
                 uint8_t b = RS485.read();
-                resB[j] = b;
+                res[j] = b;
             }
             // Check response is as expected
-            if (resB[0] != batteries[i] || resB[1] != 0x03 || resB[2] != 0x02 || resB[7] != 0x0d || resB[8] != 0x0a) {
+            if (res[0] != batteries[i] || res[1] != 0x03 || res[2] != 0x02 || res[7] != 0x0d || res[8] != 0x0a) {
                 readErrorCount++;
                 log(String(battStr) +"Invalid readBalance response: ");
-                logBytes(resB, sizeof(resB));
+                logBytes(res, readBalanceResLen);
                 logln("");
                 continue;
             }
             
-            balance = bitRead(resB[3], 0);  // Balance Status
+            balance = bitRead(res[3], 0);  // Balance Status
             
             // Output SOC
             if (debugLevel >= 2) {
@@ -722,7 +777,7 @@ void loop() {
             setECEL(currentStatus);
             
             // Handle the status change
-            handleStatusChange(currentStatus, batteries[i], volts, temps, soc);
+            handleStatusChange(currentStatus, batteries[i], volts, temps, soc, current);
         }
     }
     
@@ -807,6 +862,16 @@ void loop() {
     // debugLevel 21->1
     if (debugLevel == 21) {
         debugLevel = 1;
+        if (debugInterval > 0) {
+            lastDebugOutput = seconds();
+        }
+    } else if (debugInterval > 0) {
+        if (seconds() - lastDebugOutput >= debugInterval) {
+            debugLevel = 21;
+        }
+    } else {
+        // Ensure we call seconds() to keep track when millis() wraps
+        seconds();
     }
     
     // Check for commands from serial console
@@ -829,6 +894,7 @@ void loop() {
         if (strcmp(input,"debug 0") == 0) {
             Console.println("debug 0");
             debugLevel = 0;
+            debugInterval = 0;
             #ifdef EnableSaveSettingsToEEPROM
                 EEPROM.update(EEPROMSettings, debugLevel);
             #endif
@@ -836,6 +902,7 @@ void loop() {
         } else if (strcmp(input,"debug 1") == 0) {
             Console.println("debug 1");
             debugLevel = 1;
+            debugInterval = 0;
             #ifdef EnableSaveSettingsToEEPROM
                 EEPROM.update(EEPROMSettings, debugLevel);
             #endif
@@ -843,6 +910,7 @@ void loop() {
         } else if (strcmp(input,"debug 2") == 0) {
             Console.println("debug 2");
             debugLevel = 2;
+            debugInterval = 0;
             #ifdef EnableSaveSettingsToEEPROM
                 EEPROM.update(EEPROMSettings, debugLevel);
             #endif
@@ -850,9 +918,24 @@ void loop() {
         } else if (strcmp(input,"debug 21") == 0) {
             Console.println("debug 21");
             debugLevel = 21;
+            debugInterval = 0;
             #ifdef EnableSaveSettingsToEEPROM
                 EEPROM.update(EEPROMSettings, 1);
             #endif
+            
+        } else if (strncmp(input,"debug 2 ",8) == 0) {
+            int n = atoi(input+8);
+            if (n > 0) {
+                Console.println("debug 2 "+String(n));
+                debugLevel = 21;
+                debugInterval = n;
+                #ifdef EnableSaveSettingsToEEPROM
+                    EEPROM.update(EEPROMSettings, 1);
+                #endif
+            } else {
+                Console.println("debug 2 <n>");
+                Console.println("<n> must be a positive integer");
+            }
             
         } else if (strcmp(input,"mode normal") == 0) {
             Console.println("mode normal");
@@ -930,10 +1013,10 @@ void loop() {
                     uint8_t batteryId;
                     EEPROM.get(b+6, batteryId);
                     if (batteryId != 0) {
-                        char str[7];
+                        char str[9];
                         
                         sprintf(str, "%-5u", batteryId);
-                        Console.println("Triggered by battery "+ String(str) +" V1   V2   V3   V4   VT    T1   T2   T3   T4   PCBA SOC");
+                        Console.println("Triggered by battery "+ String(str) +" V1   V2   V3   V4   VT    T1   T2   T3   T4   PCBA SOC   CURRENT");
                         Console.print(  "                           ");
                     
                         int total = 0;
@@ -948,9 +1031,12 @@ void loop() {
                                 Console.print(str);
                             }
                         }
-                        uint16_t val;
-                        EEPROM.get(b+7+j*2, val);
-                        sprintf(str, "%-6.1f", val/10.0);
+                        EEPROM.get(b+7+j*2, soc);
+                        sprintf(str, "%-6.1f", soc/10.0);
+                        Console.print(str);
+                        
+                        EEPROM.get(b+7+(j+1)*2, current);
+                        sprintf(str, "%-8.2f", current/100.0);
                         Console.println(str);
                     }
                 }
@@ -986,6 +1072,7 @@ void loop() {
             Console.println("debug 1");
             Console.println("debug 2");
             Console.println("debug 21");
+            Console.println("debug 2 <n>");
             Console.println("mode normal");
             Console.println("mode storage");
             Console.println("log read");
@@ -1001,7 +1088,7 @@ void loop() {
         setECEL(currentStatus);
             
         // Handle the status change
-        handleStatusChange(currentStatus, 0, volts, temps, soc);
+        handleStatusChange(currentStatus, 0, volts, temps, soc, current);
     }
 
     // Pause between loops
@@ -1017,9 +1104,6 @@ void loop() {
     }
     
     previousStatus = currentStatus;
-    
-    // Ensure we keep track when millis() wraps
-    seconds();
 }
 
 // Enabled/disable charging and load based on current status
@@ -1045,7 +1129,7 @@ void setECEL(uint16_t &currentStatus) {
 
 // Outputs info on status change, and records to EEPROM
 // If batteryId == 0 then volts, temps & soc are ignored
-void handleStatusChange(uint16_t currentStatus, uint8_t batteryId, int16_t volts[], int16_t temps[], uint16_t soc) {
+void handleStatusChange(uint16_t currentStatus, uint8_t batteryId, int16_t volts[], int16_t temps[], uint16_t soc, int16_t current) {
     logln("Status change triggered    ST   STC  EC   EL   OTW  OTS  OVW  OVS  UVW  UVS  CW   CS");
     log(  "Previous status:           ");
     logStatusLn(previousStatus);
@@ -1054,11 +1138,12 @@ void handleStatusChange(uint16_t currentStatus, uint8_t batteryId, int16_t volts
     if (batteryId != 0) {
         char str[6];
         sprintf(str, "%-5u", batteryId);
-        logln("Triggered by battery "+ String(str) +" V1   V2   V3   V4   VT    T1   T2   T3   T4   PCBA SOC");
+        logln("Triggered by battery "+ String(str) +" V1   V2   V3   V4   VT    T1   T2   T3   T4   PCBA SOC   CURRENT");
         log(  "                           ");
         logVolts(volts);
         logTemps(temps);
         logSOC(soc);
+        logCurrent(current);
         logln("");
     }
     logln("");
@@ -1093,12 +1178,15 @@ void handleStatusChange(uint16_t currentStatus, uint8_t batteryId, int16_t volts
             
             EEPROM.put(nextEEPROMAddress, soc);  // 2 bytes
             nextEEPROMAddress += 2;
+            
+            EEPROM.put(nextEEPROMAddress, current);  // 2 bytes
+            nextEEPROMAddress += 2;
         
-            //for (j = 0; j < 5; j++) {  // 5 bytes unused
+            //for (j = 0; j < 3; j++) {  // 3 bytes unused
             //    EEPROM.update(nextEEPROMAddress, 0);
             //    nextEEPROMAddress += 1;
             //}
-            nextEEPROMAddress += 5;  // 5 bytes unused
+            nextEEPROMAddress += 3;  // 5 bytes unused
             
         } else {
             nextEEPROMAddress += 25;
@@ -1126,6 +1214,9 @@ void logln(const String &p) {
 }
 void loghex(const uint8_t &p) {
     if (debugLevel > 0) {
+        if (p < 0x10) {
+            Console.print('0');
+        }
         Console.print(p, HEX);
     }
 }
@@ -1181,7 +1272,13 @@ void logSOC(uint16_t soc) {
     sprintf(str, "%-6.1f", soc/10.0);
     log(str);
 }
-// Outputs Balance
+// Outputs current
+void logCurrent(int16_t current) {
+    char str[9];
+    sprintf(str, "%-8.2f", current/100.0);
+    log(str);
+}
+// Outputs balance
 void logBalance(uint8_t balance) {
     char str[6];
     sprintf(str, "%-5d", balance);
