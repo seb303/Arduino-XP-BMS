@@ -1,4 +1,4 @@
-// Arduino-XP-BMS  v1.1 2020-09-01
+// Arduino-XP-BMS  v1.2 2020-09-02
 // -------------------------------
 // A BMS for Valence XP batteries, designed to run on Arduino or similar hardware.
 // by Seb Francis -> https://diysolarforum.com/members/seb303.13166/
