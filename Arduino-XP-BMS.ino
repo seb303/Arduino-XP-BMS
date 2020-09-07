@@ -1,4 +1,4 @@
-// Arduino-XP-BMS  v1.2 2020-09-02
+// Arduino-XP-BMS  v1.3 2020-09-07
 // -------------------------------
 // A BMS for Valence XP batteries, designed to run on Arduino or similar hardware.
 // by Seb Francis -> https://diysolarforum.com/members/seb303.13166/
@@ -7,11 +7,11 @@
 //
 //
 // Inspired by:
-//  ____                _  _____  ___  __  _______
-// / __ \___  ___ ___  | |/_/ _ \/ _ )/  |/  / __/
-/// /_/ / _ \/ -_) _ \_>  </ ___/ _  / /|_/ /\ \  
-//\____/ .__/\__/_//_/_/|_/_/  /____/_/  /_/___/
-//    /_/
+//   ____                _  _____  ___  __  _______
+//  / __ \___  ___ ___  | |/_/ _ \/ _ )/  |/  / __/
+// / /_/ / _ \/ -_) _ \_>  </ ___/ _  / /|_/ /\ \.
+// \____/ .__/\__/_//_/_/|_/_/  /____/_/  /_/___/
+//     /_/
 // https://github.com/t3chN0Mad/OpenXPBMS
 //
 //
@@ -49,7 +49,7 @@
 // * A 5V voltage regulator
 // * An external RS485 transceiver such as the MAX485 (if the MCU inputs are not 5V tolerant run the RO/RX through a potential divider)
 // * Some LEDs/resistors for the status display
-// * Some MOSFETs/resistors to convert the Enable outputs to the voltage/current levels required for the charging & load control
+// * Something to convert the logic level Enable outputs to the voltage/current levels required for the charging & load control
 //
 // Installation & Configuration
 // ----------------------------
@@ -118,9 +118,10 @@
 #include <EEPROM.h>
 
 // Digital out pin numbers for external control
-// High when enabled
 #define EnableCharging 3
+#define InvertEnableCharging  // Invert = Low when enabled. Comment out for High when enabled.
 #define EnableLoad 4
+//#define InvertEnableLoad  // Invert = Low when enabled. Comment out for High when enabled.
 
 // Digital out pin numbers for external status display
 // High when triggered
@@ -166,15 +167,15 @@ uint8_t batteries[] = {17, 19};
 
 // Over temperature thresholds (0.01C)
 // A shutdown condition disables charging and load
-int16_t cellOT_Warning = 5500;  // Valence U-BMS value = 6000
+int16_t cellOT_Warning = 5000;  // Valence U-BMS value = 6000
 int16_t cellOT_Shutdown = 6000; // Valence U-BMS value = 6500
-int16_t PCBAOT_Warning = 8000;  // Valence U-BMS value = 8000
-int16_t PCBAOT_Shutdown = 8500; // Valence U-BMS value = 8500
+int16_t PCBAOT_Warning = 7500;  // Valence U-BMS value = 8000
+int16_t PCBAOT_Shutdown = 8000; // Valence U-BMS value = 8500
 int16_t OT_Hysteresis = 200;    // Temperature of all cells must drop below threshold by this amount before warning/shutdown disabled
 
 // Over voltage thresholds (mV)
 // A shutdown condition disables charging
-int16_t cellOV_Warning = 3600;  // Valence U-BMS value = 3900  [maybe 3600 will trigger warnings too easily, 3700 might be better]
+int16_t cellOV_Warning = 3700;  // Valence U-BMS value = 3900
 int16_t cellOV_Shutdown = 3900; // Valence U-BMS value = 4000
 int16_t OV_Hysteresis = 200;    // Voltage of all cells must drop below threshold by this amount before warning/shutdown disabled
 
@@ -259,6 +260,12 @@ void setup() {
     // Set up pins, etc.
     pinMode(EnableCharging, OUTPUT);
     pinMode(EnableLoad, OUTPUT);
+    #ifdef InvertEnableCharging
+        digitalWrite(EnableCharging, 1);
+    #endif
+    #ifdef InvertEnableLoad
+        digitalWrite(EnableLoad, 1);
+    #endif
     pinMode(OverTemperatureWarning, OUTPUT);
     pinMode(OverTemperatureShutdown, OUTPUT);
     pinMode(OverVoltageWarning, OUTPUT);
@@ -1041,6 +1048,14 @@ void loop() {
                     }
                 }
                 Console.println("___________________________________________________________________________________\r\n");
+                    
+                uint32_t secondsNow = seconds();
+                Console.print("Currently: ");
+                Console.print(numberOfDays(secondsNow), DEC);
+                printDigits(numberOfHours(secondsNow));
+                printDigits(numberOfMinutes(secondsNow));
+                printDigits(numberOfSeconds(secondsNow));
+                Console.println(" since power on");
                 
             #else
                 Console.println("logging to EEPROM is disabled");
@@ -1111,18 +1126,34 @@ void setECEL(uint16_t &currentStatus) {
     // Charging
     if ( bitRead(currentStatus, STATUS_OTS) == 0 && bitRead(currentStatus, STATUS_OVS) == 0 && bitRead(currentStatus, STATUS_CS) == 0 &&
             (bitRead(currentStatus, STATUS_ST) == 0 || bitRead(currentStatus, STATUS_STC) == 1) ) {
-        digitalWrite(EnableCharging, 1);
+        #ifdef InvertEnableCharging
+            digitalWrite(EnableCharging, 0);
+        #else
+            digitalWrite(EnableCharging, 1);
+        #endif
         bitSet(currentStatus, STATUS_EC);
     } else {
-        digitalWrite(EnableCharging, 0);
+        #ifdef InvertEnableCharging
+            digitalWrite(EnableCharging, 1);
+        #else
+            digitalWrite(EnableCharging, 0);
+        #endif
         bitClear(currentStatus, STATUS_EC);
     }
     // Load
     if (bitRead(currentStatus, STATUS_OTS) == 0 && bitRead(currentStatus, STATUS_UVS) == 0 && bitRead(currentStatus, STATUS_CS) == 0) {
-        digitalWrite(EnableLoad, 1);
+        #ifdef InvertEnableLoad
+            digitalWrite(EnableLoad, 0);
+        #else
+            digitalWrite(EnableLoad, 1);
+        #endif
         bitSet(currentStatus, STATUS_EL);
     } else {
-        digitalWrite(EnableLoad, 0);
+        #ifdef InvertEnableLoad
+            digitalWrite(EnableLoad, 1);
+        #else
+            digitalWrite(EnableLoad, 0);
+        #endif
         bitClear(currentStatus, STATUS_EL);
     }
 }

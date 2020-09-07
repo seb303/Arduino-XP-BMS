@@ -1,4 +1,4 @@
-Arduino-XP-BMS  v1.2 2020-09-02
+Arduino-XP-BMS  v1.3 2020-09-07
 -------------------------------
 A BMS for Valence XP batteries, designed to run on Arduino or similar hardware.  
 by Seb Francis -> https://diysolarforum.com/members/seb303.13166/
@@ -39,7 +39,7 @@ Requires the following additional components:
 * A 5V voltage regulator
 * An external RS485 transceiver such as the MAX485 (if the MCU inputs are not 5V tolerant run the RO/RX through a potential divider)
 * Some LEDs/resistors for the status display
-* Some MOSFETs/resistors to convert the Enable outputs to the voltage/current levels required for the charging & load control
+* Something to convert the logic level Enable outputs to the voltage/current levels required for the charging & load control
 
 Installation & Configuration
 ----------------------------
