@@ -6,6 +6,8 @@ The voltage regulator module U2 is needed to convert the battery voltage down to
 
 The PNP transistor output stage for EC and EL is designed to provide a signal voltage only and will not provide much current (although it is short-circuit proof). If more current is required, or if it needs to hold the signal more strongly to 0V when off, then changes in the resistor values would need to be made. If it needs to provide any significant current then a P-Channel MOSFET would be a much better choice instead of the PNP transistor.
 ```
+datasheets                            - Datasheets of component boards used
+with-EL-switch                        - Alternative version that supports an external switch to manually disconnect load
 Arduino-XP-BMS-schematic.dsn          - Schematic (TinyCad)
 Arduino-XP-BMS-schematic.net          - Netlist (Protel)
 Arduino-XP-BMS-schematic.pdf          - Schematic (PDF)
