@@ -1,4 +1,4 @@
-// Arduino-XP-BMS  v1.3 2020-09-07
+// Arduino-XP-BMS  v1.4 2020-09-08
 // -------------------------------
 // A BMS for Valence XP batteries, designed to run on Arduino or similar hardware.
 // by Seb Francis -> https://diysolarforum.com/members/seb303.13166/
@@ -65,6 +65,7 @@
 // Console interface
 // -----------------
 // Commands can be entered via the Serial Monitor.
+// help         - show available commands
 // debug 0      - turn off debugging output
 // debug 1      - debugging output shows errors, status changes and other occasional info
 // debug 2      - in addition to the above, debugging output shows continuous status and readings from batteries
@@ -1079,21 +1080,25 @@ void loop() {
                 statusChangeTriggered = 1;
             }
             
-        } else {
-            Console.println("Unrecognised command: "+ String(input));
+        } else if (strcmp(input,"help") == 0) {
             Console.println("\r\nAvailable commands:");
             Console.println(    "-------------------");
-            Console.println("debug 0");
-            Console.println("debug 1");
-            Console.println("debug 2");
-            Console.println("debug 21");
-            Console.println("debug 2 <n>");
-            Console.println("mode normal");
-            Console.println("mode storage");
-            Console.println("log read");
-            Console.println("log clear");
-            Console.println("reset cw");
+            Console.println("help         - show available commands");
+            Console.println("debug 0      - turn off debugging output");
+            Console.println("debug 1      - debugging output shows errors, status changes and other occasional info");
+            Console.println("debug 2      - in addition to the above, debugging output shows continuous status and readings from batteries");
+            Console.println("debug 21     - show status and readings from batteries once, then switch to debug level 1");
+            Console.println("debug 2 <n>  - show status and readings from batteries every <n> seconds, otherwise as debug level 1");
+            Console.println("mode normal  - enter normal mode");
+            Console.println("mode storage - enter long term storage mode");
+            Console.println("log read     - read events log from EEPROM");
+            Console.println("log clear    - clear events log");
+            Console.println("reset cw     - resets CommsWarning status (otherwise this stays on once triggered)");
             Console.println("");
+            
+        } else {
+            Console.println("Unrecognised command: '"+ String(input) +"'");
+            Console.println("Enter 'help' to show available commands");
         }
     }
     

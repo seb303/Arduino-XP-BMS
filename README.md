@@ -1,4 +1,4 @@
-Arduino-XP-BMS  v1.3 2020-09-07
+Arduino-XP-BMS  v1.4 2020-09-08
 -------------------------------
 A BMS for Valence XP batteries, designed to run on Arduino or similar hardware.  
 by Seb Francis -> https://diysolarforum.com/members/seb303.13166/
@@ -56,6 +56,7 @@ Console interface
 -----------------
 ```
 Commands can be entered via the Serial Monitor.
+help         - show available commands
 debug 0      - turn off debugging output
 debug 1      - debugging output shows errors, status changes and other occasional info
 debug 2      - in addition to the above, debugging output shows continuous status and readings from batteries
