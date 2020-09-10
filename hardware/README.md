@@ -13,5 +13,7 @@ Arduino-XP-BMS-schematic.net          - Netlist (Protel)
 Arduino-XP-BMS-schematic.pdf          - Schematic (PDF)
 Arduino-XP-BMS-stripboard-layout.pdf  - Stripboard layout (PDF)
 Arduino-XP-BMS-stripboard-layout.per  - Stripboard layout (VeeCad)
+Final-1.jpg                           - Final hardware build
+Final-2.jpg                           - Final hardware build
 Prototype.jpg                         - Initial breadboard prototype
 ```
