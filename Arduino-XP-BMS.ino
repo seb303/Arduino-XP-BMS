@@ -1,4 +1,4 @@
-// Arduino-XP-BMS  v1.4 2020-09-08
+// Arduino-XP-BMS  v1.5 2020-09-12
 // -------------------------------
 // A BMS for Valence XP batteries, designed to run on Arduino or similar hardware.
 // by Seb Francis -> https://diysolarforum.com/members/seb303.13166/
@@ -250,7 +250,11 @@ unsigned int nextEEPROMAddress;
 #define numberOfSeconds(_time_) (_time_ % SECS_PER_MIN)  
 #define numberOfMinutes(_time_) ((_time_ / SECS_PER_MIN) % SECS_PER_MIN)
 #define numberOfHours(_time_) (( _time_% SECS_PER_DAY) / SECS_PER_HOUR)
-#define numberOfDays(_time_) ( _time_ / SECS_PER_DAY)  
+#define numberOfDays(_time_) ( _time_ / SECS_PER_DAY)
+
+// Console input buffer
+char input[32];
+unsigned int inputLen = 0;
 
 
 void setup() {
@@ -883,22 +887,30 @@ void loop() {
     }
     
     // Check for commands from serial console
-    char input[32];
-    unsigned int len = 0;
-    while (Console.available() && len+1 < sizeof(input)) {
-        input[len] = Console.read();
-        if (input[len] == 13 || input[len] == 10) {
-            input[len] = 0;
-        }
-        len++;
-    }
-    // Ensure string is terminated
-    input[len] = 0;
-    // Discard rest of buffer
+    bool isCommand = 0;
     while (Console.available()) {
-        Console.read();
+        if (inputLen+1 >= sizeof(input)) {
+            // Discard rest of buffer
+            while (Console.available()) {
+                Console.read();
+            }
+            // Terminate string
+            input[inputLen] = 0;
+            isCommand = 1;
+            inputLen = 0;
+            break;
+        }
+        input[inputLen] = Console.read();
+        if (input[inputLen] == 13 || input[inputLen] == 10) {
+            // Terminate string
+            input[inputLen] = 0;
+            isCommand = 1;
+            inputLen = 0;
+            break;
+        }
+        inputLen++;
     }
-    if (len > 0) {
+    if (isCommand) {
         if (strcmp(input,"debug 0") == 0) {
             Console.println("debug 0");
             debugLevel = 0;
