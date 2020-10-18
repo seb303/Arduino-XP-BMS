@@ -1,4 +1,4 @@
-// Arduino-XP-BMS  v1.5 2020-09-12
+// Arduino-XP-BMS  v1.6 2020-10-18
 // -------------------------------
 // A BMS for Valence XP batteries, designed to run on Arduino or similar hardware.
 // by Seb Francis -> https://diysolarforum.com/members/seb303.13166/
@@ -188,8 +188,9 @@ int16_t UV_Hysteresis = 200;    // Voltage of all cells must rise above threshol
 
 // Long term storage SOC range (%)
 // These parameters only have an effect when in long term storage mode
-uint16_t storageMinSOC = 50;     // If at least 1 battery drops to this SOC level, charging is enabled
-uint16_t storageMaxSOC = 80;     // Once charging is enabled, when at least 1 battery reaches this SOC level, charging is disabled again
+uint16_t storageMinSOC = 40;     // If at least 1 battery drops to this SOC level, charging is enabled.
+uint16_t storageMaxSOC = 50;     // Once charging is enabled, when at least 1 battery reaches this SOC level
+                                 // and all batteries are over storageMinSOC, charging is disabled again.
 
 
 // Not much to configure beyond this point....
@@ -348,6 +349,8 @@ void loop() {
     bool allClear_UnderVoltageShutdown = 1;
     bool allClear_OverTemperatureWarning = 1;
     bool allClear_OverTemperatureShutdown = 1;
+    bool reached_storageMinSOC = 0;
+    bool reached_storageMaxSOC = 0;
     unsigned int readErrorCount = 0;
     uint16_t currentStatus = previousStatus;
     uint8_t res[31];  // Longest response is 31 bytes
@@ -359,7 +362,7 @@ void loop() {
 
     // Header row
     if (debugLevel >= 2) {
-        logln("             V1   V2   V3   V4   VT    T1   T2   T3   T4   PCBA SOC   CURRENT BAL");
+        logln("             V1    V2    V3    V4    VT     T1   T2   T3   T4   PCBA SOC   CURRENT BAL");
     }
         
     // Iterate through all of the batteries connected to the BMS.
@@ -652,16 +655,14 @@ void loop() {
             
             // Check SOC if in storage mode
             if (bitRead(previousStatus, STATUS_ST) == 1) {
-                if (bitRead(previousStatus, STATUS_STC) == 0) {
-                    if (soc <= storageMinSOC*10) {
+                if (soc <= storageMinSOC*10) {
+                    reached_storageMinSOC = 1;
+                    if (bitRead(previousStatus, STATUS_STC) == 0) {
                         bitSet(currentStatus, STATUS_STC);
                         statusChangeTriggered = 1;
                     }
-                } else {
-                    if (soc >= storageMaxSOC*10) {
-                        bitClear(currentStatus, STATUS_STC);
-                        statusChangeTriggered = 1;
-                    }
+                } else if (soc >= storageMaxSOC*10) {
+                    reached_storageMaxSOC = 1;
                 }
             }
         } else { // Didn't receive expected response
@@ -793,8 +794,17 @@ void loop() {
         }
     }
     
-    // Clear warnings or shutdowns if everything is ok now
     bool statusChangeTriggered = 0;
+    
+    // Change of charging state in storage mode?
+    if (bitRead(previousStatus, STATUS_ST) == 1) {
+        if (bitRead(previousStatus, STATUS_STC) == 1 && reached_storageMaxSOC && !reached_storageMinSOC) {
+            bitClear(currentStatus, STATUS_STC);
+            statusChangeTriggered = 1;
+        }
+    }
+    
+    // Clear warnings or shutdowns if everything is ok now
     if (bitRead(previousStatus, STATUS_OVW) == 1 && allClear_OverVoltageWarning) {
         bitClear(currentStatus, STATUS_OVW);
         statusChangeTriggered = 1;
@@ -1036,7 +1046,7 @@ void loop() {
                         char str[9];
                         
                         sprintf(str, "%-5u", batteryId);
-                        Console.println("Triggered by battery "+ String(str) +" V1   V2   V3   V4   VT    T1   T2   T3   T4   PCBA SOC   CURRENT");
+                        Console.println("Triggered by battery "+ String(str) +" V1    V2    V3    V4    VT     T1   T2   T3   T4   PCBA SOC   CURRENT");
                         Console.print(  "                           ");
                     
                         int total = 0;
@@ -1108,7 +1118,7 @@ void loop() {
             Console.println("reset cw     - resets CommsWarning status (otherwise this stays on once triggered)");
             Console.println("");
             
-        } else {
+        } else if (strcmp(input,"") != 0) {
             Console.println("Unrecognised command: '"+ String(input) +"'");
             Console.println("Enter 'help' to show available commands");
         }
@@ -1186,7 +1196,7 @@ void handleStatusChange(uint16_t currentStatus, uint8_t batteryId, int16_t volts
     if (batteryId != 0) {
         char str[6];
         sprintf(str, "%-5u", batteryId);
-        logln("Triggered by battery "+ String(str) +" V1   V2   V3   V4   VT    T1   T2   T3   T4   PCBA SOC   CURRENT");
+        logln("Triggered by battery "+ String(str) +" V1    V2    V3    V4    VT      T1   T2   T3   T4   PCBA SOC   CURRENT");
         log(  "                           ");
         logVolts(volts);
         logTemps(temps);
@@ -1299,18 +1309,18 @@ void logVolts(int16_t volts[]) {
     int total = 0;
     char str[7];
     for (unsigned int j = 0; j < NumberOfCells; j++) {
-        sprintf(str, "%-5d", volts[j]);
+        sprintf(str, "%-6.3f", volts[j]/1000.0);
         log(str);
         total += volts[j];
     }
-    sprintf(str, "%-6d", total);
+    sprintf(str, "%-7.3f", total/1000.0);
     log(str);
 }
 // Outputs temperatures
 void logTemps(int16_t temps[]) {
     char str[6];
     for (unsigned int j = 0; j < NumberOfCells+1; j++) {
-        sprintf(str, "%-5d", temps[j]);
+        sprintf(str, "%-5.2f", temps[j]/100.0);
         log(str);
     }
 }
