@@ -1244,7 +1244,7 @@ void handleStatusChange(uint16_t currentStatus, uint8_t batteryId, int16_t volts
             //    EEPROM.update(nextEEPROMAddress, 0);
             //    nextEEPROMAddress += 1;
             //}
-            nextEEPROMAddress += 3;  // 5 bytes unused
+            nextEEPROMAddress += 3;  // 3 bytes unused
             
         } else {
             nextEEPROMAddress += 25;
