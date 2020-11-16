@@ -1,4 +1,4 @@
-// Arduino-XP-BMS  v1.6 2020-10-18
+// Arduino-XP-BMS  v1.7 2020-11-16
 // -------------------------------
 // A BMS for Valence XP batteries, designed to run on Arduino or similar hardware.
 // by Seb Francis -> https://diysolarforum.com/members/seb303.13166/
@@ -546,7 +546,7 @@ void loop() {
             if (bitRead(previousStatus, STATUS_OTW) == 0) {
                 // Currently no warning
                 for (j = 0; j < NumberOfCells+1; j++) {
-                    if (j <= 4) {
+                    if (j < NumberOfCells) {
                         if (temps[j] > cellOT_Warning) {
                             bitSet(currentStatus, STATUS_OTW);
                             statusChangeTriggered = 1;
@@ -561,7 +561,7 @@ void loop() {
             } else {
                 // Currently in warning state
                 for (j = 0; j < NumberOfCells+1; j++) {
-                    if (j <= 4) {
+                    if (j < NumberOfCells) {
                         if (temps[j] > cellOT_Warning-OT_Hysteresis) {
                             allClear_OverTemperatureWarning = 0;
                         }
@@ -575,7 +575,7 @@ void loop() {
             if (bitRead(previousStatus, STATUS_OTS) == 0) {
                 // Currently no shutdown
                 for (j = 0; j < NumberOfCells+1; j++) {
-                    if (j <= 4) {
+                    if (j < NumberOfCells) {
                         if (temps[j] > cellOT_Shutdown) {
                             bitSet(currentStatus, STATUS_OTS);
                             statusChangeTriggered = 1;
@@ -590,7 +590,7 @@ void loop() {
             } else {
                 // Currently in shutdown state
                 for (j = 0; j < NumberOfCells+1; j++) {
-                    if (j <= 4) {
+                    if (j < NumberOfCells) {
                         if (temps[j] > cellOT_Shutdown-OT_Hysteresis) {
                             allClear_OverTemperatureShutdown = 0;
                         }
